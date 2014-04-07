@@ -9,8 +9,8 @@ module Deb::S3::Utils
   def s3= v; @s3 = v end
   def bucket; @bucket end
   def bucket= v; @bucket = v end
-  def access_policy; @access_policy end
-  def access_policy= v; @access_policy = v end
+  def is_public; @is_public end
+  def is_public= v; @is_public = v end
   def signing_key; @signing_key end
   def signing_key= v; @signing_key = v end
   def gpg_options; @gpg_options end
@@ -52,29 +52,36 @@ module Deb::S3::Utils
   end
 
   def s3_exists?(path)
-    Deb::S3::Utils.s3.buckets[Deb::S3::Utils.bucket].objects[s3_path(path)].exists?
+    return true if Deb::S3::Utils.bucket.files.head(File.basename(path))
+    return false
   end
 
   def s3_read(path)
+    #puts "blerg: #{Deb::S3::Utils.bucket.files}"
     return nil unless s3_exists?(path)
-    Deb::S3::Utils.s3.buckets[Deb::S3::Utils.bucket].objects[s3_path(path)].read
+    Deb::S3::Utils.bucket.files[s3_path(path)].read
   end
 
   def s3_store(path, filename=nil, content_type='application/octet-stream; charset=binary')
     filename = File.basename(path) unless filename
-    obj = Deb::S3::Utils.s3.buckets[Deb::S3::Utils.bucket].objects[s3_path(filename)]
-
+    obj = Deb::S3::Utils.bucket.files.head(filename)
     # check if the object already exists
-    if obj.exists?
+    unless obj.nil?
       file_md5 = Digest::MD5.file(path)
       return if file_md5.to_s == obj.etag.gsub('"', '')
     end
 
     # upload the file
-    obj.write(Pathname.new(path), :acl => Deb::S3::Utils.access_policy, :content_type => content_type)
+    file = Deb::S3::Utils.bucket.files.create(
+      :key    => s3_path(filename),
+      :body   => File.open(path),
+      :public => Deb::S3::Utils.is_public,
+      :content_type => content_type
+    )
+    # obj.write(Pathname.new(path), :acl => Deb::S3::Utils.access_policy, :content_type => content_type)
   end
 
   def s3_remove(path)
-    Deb::S3::Utils.s3.buckets[Deb::S3::Utils.bucket].objects[s3_path(path)].delete if s3_exists?(path)
+    Deb::S3::Utils.bucket.files[s3_path(path)].destroy if s3_exists?(path)
   end
 end

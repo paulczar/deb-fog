@@ -1,4 +1,5 @@
-require "aws"
+#require "aws"
+require "fog"
 require "thor"
 
 # Hack: aws requires this!
@@ -36,6 +37,10 @@ class Deb::S3::CLI < Thor
   :type     => :string,
   :aliases  => "-s",
   :hide     => true
+
+  class_option :provider,
+  :type     => :string,
+  :desc     => "The Cloud Provider to use: AWS|Google|Rackspace"
 
   class_option :access_key_id,
   :type     => :string,
@@ -268,44 +273,36 @@ class Deb::S3::CLI < Thor
     exit 1
   end
 
-  def provider
-    access_key_id     = options[:access_key_id]
-    secret_access_key = options[:secret_access_key]
-
-    if access_key_id.nil? ^ secret_access_key.nil?
-      error("If you specify one of --access-key-id or --secret-access-key, you must specify the other.")
-    end
-
-    static_credentials = {}
-    static_credentials[:access_key_id]     = access_key_id     if access_key_id
-    static_credentials[:secret_access_key] = secret_access_key if secret_access_key
-
-    AWS::Core::CredentialProviders::DefaultProvider.new(static_credentials)
-  end
-
   def configure_s3_client
     error("No value provided for required options '--bucket'") unless options[:bucket]
-
-    settings = { :s3_endpoint => options[:endpoint] }
-    settings.merge!(provider.credentials)
-
-    Deb::S3::Utils.s3          = AWS::S3.new(settings)
-    Deb::S3::Utils.bucket      = options[:bucket]
+    credentials = {:provider => options[:provider]}
+    case credentials[:provider]
+    when 'AWS'
+      credentials[:aws_access_key_id] = options[:access_key_id]     if options[:access_key_id]
+      credentials[:aws_secret_access_key]  = options[:secret_access_key] if options[:secret_access_key]
+    when 'Rackspace'
+      credentials[:rackspace_username] = options[:access_key_id]     if options[:access_key_id]
+      credentials[:rackspace_api_key]  = options[:secret_access_key] if options[:secret_access_key]
+    else
+      error("Invalid provider.  Can be AWS or Rackspace")
+    end
+    puts "lolzlolz #{credentials.inspect}"
+    Deb::S3::Utils.s3          = Fog::Storage.new(credentials)
+    Deb::S3::Utils.bucket      = Deb::S3::Utils.s3.directories.new :key => options[:bucket]
+    Deb::S3::Utils.bucket.reload
     Deb::S3::Utils.signing_key = options[:sign]
     Deb::S3::Utils.gpg_options = options[:gpg_options]
     Deb::S3::Utils.prefix      = options[:prefix]
 
     # make sure we have a valid visibility setting
-    Deb::S3::Utils.access_policy =
+    Deb::S3::Utils.is_public =
       case options[:visibility]
       when "public"
-        :public_read
+        true
       when "private"
-        :private
-      when "authenticated"
-        :authenticated_read
+        false
       else
-        error("Invalid visibility setting given. Can be public, private, or authenticated.")
+        error("Invalid visibility setting given. Can be public or private")
       end
   end
 end
