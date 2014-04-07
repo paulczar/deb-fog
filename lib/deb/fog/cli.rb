@@ -285,7 +285,6 @@ class Deb::Fog::CLI < Thor
     else
       error("Invalid provider.  Can be AWS or Rackspace")
     end
-    puts "lolzlolz #{credentials.inspect}"
     Deb::Fog::Utils.fog          = Fog::Storage.new(credentials)
     Deb::Fog::Utils.bucket      = Deb::Fog::Utils.fog.directories.new :key => options[:bucket]
     Deb::Fog::Utils.bucket.reload
