@@ -1,25 +1,24 @@
-#require "aws"
 require "fog"
 require "thor"
 
 # Hack: aws requires this!
 require "json"
 
-require "deb/s3"
-require "deb/s3/utils"
-require "deb/s3/manifest"
-require "deb/s3/package"
-require "deb/s3/release"
+require "deb/fog"
+require "deb/fog/utils"
+require "deb/fog/manifest"
+require "deb/fog/package"
+require "deb/fog/release"
 
-class Deb::S3::CLI < Thor
+class Deb::Fog::CLI < Thor
   class_option :bucket,
   :type     => :string,
   :aliases  => "-b",
-  :desc     => "The name of the S3 bucket to upload to."
+  :desc     => "The name of the Fog bucket to upload to."
 
   class_option :prefix,
   :type     => :string,
-  :desc     => "The path prefix to use when storing on S3."
+  :desc     => "The path prefix to use when storing on Fog."
 
   class_option :codename,
   :default  => "stable",
@@ -44,16 +43,16 @@ class Deb::S3::CLI < Thor
 
   class_option :access_key_id,
   :type     => :string,
-  :desc     => "The access key for connecting to S3."
+  :desc     => "The access key for connecting to Fog."
 
   class_option :secret_access_key,
   :type     => :string,
-  :desc     => "The secret key for connecting to S3."
+  :desc     => "The secret key for connecting to Fog."
 
   class_option :endpoint,
   :type     => :string,
-  :desc     => "The region endpoint for connecting to S3.",
-  :default  => "s3.amazonaws.com"
+  :desc     => "The region endpoint for connecting to Fog.",
+  :default  => "fog.amazonaws.com"
 
   class_option :visibility,
   :default  => "public",
@@ -74,7 +73,7 @@ class Deb::S3::CLI < Thor
   :desc    => "Additional command line options to pass to GPG when signing"
 
   desc "upload FILES",
-  "Uploads the given files to a S3 bucket as an APT repository."
+  "Uploads the given files to a Fog bucket as an APT repository."
 
   option :arch,
   :type     => :string,
@@ -104,18 +103,18 @@ class Deb::S3::CLI < Thor
       error("File '#{missing_file}' doesn't exist")
     end
 
-    # configure AWS::S3
-    configure_s3_client
+    # configure AWS::Fog
+    configure_fog_client
 
     # retrieve the existing manifests
     log("Retrieving existing manifests")
-    release  = Deb::S3::Release.retrieve(options[:codename])
+    release  = Deb::Fog::Release.retrieve(options[:codename])
     manifests = {}
 
     # examine all the files
     files.collect { |f| Dir.glob(f) }.flatten.each do |file|
       log("Examining package file #{File.basename(file)}")
-      pkg = Deb::S3::Package.parse_file(file)
+      pkg = Deb::Fog::Package.parse_file(file)
 
       # copy over some options if they weren't given
       arch = options[:arch] || pkg.architecture
@@ -125,19 +124,19 @@ class Deb::S3::CLI < Thor
             "Please specify one with --arch [i386,amd64].") unless arch
 
       # retrieve the manifest for the arch if we don't have it already
-      manifests[arch] ||= Deb::S3::Manifest.retrieve(options[:codename], component, arch)
+      manifests[arch] ||= Deb::Fog::Manifest.retrieve(options[:codename], component, arch)
 
       # add in the package
       manifests[arch].add(pkg, options[:preserve_versions])
     end
 
     # upload the manifest
-    log("Uploading packages and new manifests to S3")
+    log("Uploading packages and new manifests to Fog")
     manifests.each_value do |manifest|
-      manifest.write_to_s3 { |f| sublog("Transferring #{f}") }
+      manifest.write_to_fog { |f| sublog("Transferring #{f}") }
       release.update_manifest(manifest)
     end
-    release.write_to_s3 { |f| sublog("Transferring #{f}") }
+    release.write_to_fog { |f| sublog("Transferring #{f}") }
 
     log("Update complete.")
   end
@@ -182,12 +181,12 @@ class Deb::S3::CLI < Thor
       error("You must specify the architecture of the package to remove.")
     end
 
-    configure_s3_client
+    configure_fog_client
 
     # retrieve the existing manifests
     log("Retrieving existing manifests")
-    release  = Deb::S3::Release.retrieve(options[:codename])
-    manifest = Deb::S3::Manifest.retrieve(options[:codename], component, options[:arch])
+    release  = Deb::Fog::Release.retrieve(options[:codename])
+    manifest = Deb::Fog::Manifest.retrieve(options[:codename], component, options[:arch])
 
     deleted = manifest.delete_package(package, versions)
     if deleted.length == 0
@@ -202,10 +201,10 @@ class Deb::S3::CLI < Thor
         }
     end
 
-    log("Uploading new manifests to S3")
-    manifest.write_to_s3 {|f| sublog("Transferring #{f}") }
+    log("Uploading new manifests to Fog")
+    manifest.write_to_fog {|f| sublog("Transferring #{f}") }
     release.update_manifest(manifest)
-    release.write_to_s3 {|f| sublog("Transferring #{f}") }
+    release.write_to_fog {|f| sublog("Transferring #{f}") }
 
     log("Update complete.")
   end
@@ -226,18 +225,18 @@ class Deb::S3::CLI < Thor
       warn("===> WARNING: The --section/-s argument is deprecated, please use --component/-m.")
     end
 
-    configure_s3_client
+    configure_fog_client
 
     log("Retrieving existing manifests")
-    release = Deb::S3::Release.retrieve(options[:codename])
+    release = Deb::Fog::Release.retrieve(options[:codename])
 
     %w[amd64 armel i386 all].each do |arch|
       log("Checking for missing packages in: #{options[:codename]}/#{options[:component]} #{arch}")
-      manifest = Deb::S3::Manifest.retrieve(options[:codename], component, arch)
+      manifest = Deb::Fog::Manifest.retrieve(options[:codename], component, arch)
       missing_packages = []
 
       manifest.packages.each do |p|
-        unless Deb::S3::Utils.s3_exists? p.url_filename_encoded
+        unless Deb::Fog::Utils.fog_exists? p.url_filename_encoded
           sublog("The following packages are missing:\n\n") if missing_packages.empty?
           puts(p.generate)
           puts("")
@@ -249,9 +248,9 @@ class Deb::S3::CLI < Thor
       if options[:fix_manifests] && !missing_packages.empty?
         log("Removing #{missing_packages.length} package(s) from the manifest...")
         missing_packages.each { |p| manifest.packages.delete(p) }
-        manifest.write_to_s3 { |f| sublog("Transferring #{f}") }
+        manifest.write_to_fog { |f| sublog("Transferring #{f}") }
         release.update_manifest(manifest)
-        release.write_to_s3 { |f| sublog("Transferring #{f}") }
+        release.write_to_fog { |f| sublog("Transferring #{f}") }
 
         log("Update complete.")
       end
@@ -273,7 +272,7 @@ class Deb::S3::CLI < Thor
     exit 1
   end
 
-  def configure_s3_client
+  def configure_fog_client
     error("No value provided for required options '--bucket'") unless options[:bucket]
     credentials = {:provider => options[:provider]}
     case credentials[:provider]
@@ -287,15 +286,15 @@ class Deb::S3::CLI < Thor
       error("Invalid provider.  Can be AWS or Rackspace")
     end
     puts "lolzlolz #{credentials.inspect}"
-    Deb::S3::Utils.s3          = Fog::Storage.new(credentials)
-    Deb::S3::Utils.bucket      = Deb::S3::Utils.s3.directories.new :key => options[:bucket]
-    Deb::S3::Utils.bucket.reload
-    Deb::S3::Utils.signing_key = options[:sign]
-    Deb::S3::Utils.gpg_options = options[:gpg_options]
-    Deb::S3::Utils.prefix      = options[:prefix]
+    Deb::Fog::Utils.fog          = Fog::Storage.new(credentials)
+    Deb::Fog::Utils.bucket      = Deb::Fog::Utils.fog.directories.new :key => options[:bucket]
+    Deb::Fog::Utils.bucket.reload
+    Deb::Fog::Utils.signing_key = options[:sign]
+    Deb::Fog::Utils.gpg_options = options[:gpg_options]
+    Deb::Fog::Utils.prefix      = options[:prefix]
 
     # make sure we have a valid visibility setting
-    Deb::S3::Utils.is_public =
+    Deb::Fog::Utils.is_public =
       case options[:visibility]
       when "public"
         true

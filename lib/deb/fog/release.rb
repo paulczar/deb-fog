@@ -1,7 +1,7 @@
 require "tempfile"
 
-class Deb::S3::Release
-  include Deb::S3::Utils
+class Deb::Fog::Release
+  include Deb::Fog::Utils
 
   attr_accessor :codename
   attr_accessor :architectures
@@ -20,7 +20,7 @@ class Deb::S3::Release
 
   class << self
     def retrieve(codename)
-      if s = Deb::S3::Utils.s3_read("dists/#{codename}/Release")
+      if s = Deb::Fog::Utils.fog_read("dists/#{codename}/Release")
         self.parse_release(s)
       else
         rel = self.new
@@ -73,7 +73,7 @@ class Deb::S3::Release
     template("release.erb").result(binding)
   end
 
-  def write_to_s3
+  def write_to_fog
     # validate some other files are present
     if block_given?
       self.validate_others { |f| yield f }
@@ -86,24 +86,24 @@ class Deb::S3::Release
     release_tmp.puts self.generate
     release_tmp.close
     yield self.filename if block_given?
-    s3_store(release_tmp.path, self.filename, 'text/plain; charset=us-ascii')
+    fog_store(release_tmp.path, self.filename, 'text/plain; charset=us-ascii')
 
     # sign the file, if necessary
-    if Deb::S3::Utils.signing_key
-      key_param = Deb::S3::Utils.signing_key != "" ? "--default-key=#{Deb::S3::Utils.signing_key}" : ""
-      if system("gpg -a #{key_param} #{Deb::S3::Utils.gpg_options} -b #{release_tmp.path}")
+    if Deb::Fog::Utils.signing_key
+      key_param = Deb::Fog::Utils.signing_key != "" ? "--default-key=#{Deb::Fog::Utils.signing_key}" : ""
+      if system("gpg -a #{key_param} #{Deb::Fog::Utils.gpg_options} -b #{release_tmp.path}")
         local_file = release_tmp.path+".asc"
         remote_file = self.filename+".gpg"
         yield remote_file if block_given?
         raise "Unable to locate Release signature file" unless File.exists?(local_file)
-        s3_store(local_file, remote_file, 'application/pgp-signature; charset=us-ascii')
+        fog_store(local_file, remote_file, 'application/pgp-signature; charset=us-ascii')
         File.unlink(local_file)
       else
         raise "Signing the Release file failed."
       end
     else
       # remove an existing Release.gpg, if it was there
-      s3_remove(self.filename+".gpg")
+      fog_remove(self.filename+".gpg")
     end
 
     release_tmp.unlink
@@ -121,14 +121,14 @@ class Deb::S3::Release
       %w(amd64 i386).each do |arch|
         next if self.files.has_key?("#{comp}/binary-#{arch}/Packages")
 
-        m = Deb::S3::Manifest.new
+        m = Deb::Fog::Manifest.new
         m.codename = self.codename
         m.component = comp
         m.architecture = arch
         if block_given?
-          m.write_to_s3 { |f| yield f }
+          m.write_to_fog { |f| yield f }
         else
-          m.write_to_s3
+          m.write_to_fog
         end
         to_apply << m
       end

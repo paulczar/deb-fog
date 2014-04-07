@@ -3,7 +3,7 @@
 $:.unshift File.expand_path('../../lib', __FILE__)
 
 require 'rubygems'
-require 'deb/s3/cli'
+require 'deb/fog/cli'
 
-Deb::S3::CLI.start
+Deb::Fog::CLI.start
 

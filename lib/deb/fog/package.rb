@@ -4,8 +4,8 @@ require "digest/md5"
 require "socket"
 require "tmpdir"
 
-class Deb::S3::Package
-  include Deb::S3::Utils
+class Deb::Fog::Package
+  include Deb::Fog::Utils
 
   attr_accessor :name
   attr_accessor :version
@@ -40,7 +40,7 @@ class Deb::S3::Package
   attr_accessor :filename
 
   class << self
-    include Deb::S3::Utils
+    include Deb::Fog::Utils
 
     def parse_file(package)
       p = self.new
@@ -134,7 +134,7 @@ class Deb::S3::Package
   end
 
   def url_filename_encoded
-    @url_filename || "pool/#{self.name[0]}/#{self.name[0..1]}/#{s3_escape(File.basename(self.filename))}"
+    @url_filename || "pool/#{self.name[0]}/#{self.name[0..1]}/#{fog_escape(File.basename(self.filename))}"
   end
 
   def needs_uploading?

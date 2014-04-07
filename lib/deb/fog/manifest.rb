@@ -1,8 +1,8 @@
 require "tempfile"
 require "zlib"
 
-class Deb::S3::Manifest
-  include Deb::S3::Utils
+class Deb::Fog::Manifest
+  include Deb::Fog::Utils
 
   attr_accessor :codename
   attr_accessor :component
@@ -19,7 +19,7 @@ class Deb::S3::Manifest
 
   class << self
     def retrieve(codename, component, architecture)
-      m = if s = Deb::S3::Utils.s3_read("dists/#{codename}/#{component}/binary-#{architecture}/Packages")
+      m = if s = Deb::Fog::Utils.fog_read("dists/#{codename}/#{component}/binary-#{architecture}/Packages")
         self.parse_packages(s)
       else
         self.new
@@ -35,7 +35,7 @@ class Deb::S3::Manifest
       m = self.new
       str.split("\n\n").each do |s|
         next if s.chomp.empty?
-        m.packages << Deb::S3::Package.parse_string(s)
+        m.packages << Deb::Fog::Package.parse_string(s)
       end
       m
     end
@@ -75,14 +75,14 @@ class Deb::S3::Manifest
     @packages.collect { |pkg| pkg.generate }.join("\n")
   end
 
-  def write_to_s3
+  def write_to_fog
     manifest = self.generate
 
     # store any packages that need to be stored
     @packages.each do |pkg|
       if pkg.needs_uploading?
         yield pkg.url_filename if block_given?
-        s3_store(pkg.filename, pkg.url_filename, 'application/octet-stream; charset=binary')
+        fog_store(pkg.filename, pkg.url_filename, 'application/octet-stream; charset=binary')
       end
     end
 
@@ -92,7 +92,7 @@ class Deb::S3::Manifest
     pkgs_temp.close
     f = "dists/#{@codename}/#{@component}/binary-#{@architecture}/Packages"
     yield f if block_given?
-    s3_store(pkgs_temp.path, f, 'text/plain; charset=us-ascii')
+    fog_store(pkgs_temp.path, f, 'text/plain; charset=us-ascii')
     @files["#{@component}/binary-#{@architecture}/Packages"] = hashfile(pkgs_temp.path)
     pkgs_temp.unlink
 
@@ -102,7 +102,7 @@ class Deb::S3::Manifest
     Zlib::GzipWriter.open(gztemp.path) { |gz| gz.write manifest }
     f = "dists/#{@codename}/#{@component}/binary-#{@architecture}/Packages.gz"
     yield f if block_given?
-    s3_store(gztemp.path, f, 'application/x-gzip; charset=binary')
+    fog_store(gztemp.path, f, 'application/x-gzip; charset=binary')
     @files["#{@component}/binary-#{@architecture}/Packages.gz"] = hashfile(gztemp.path)
     gztemp.unlink
 
