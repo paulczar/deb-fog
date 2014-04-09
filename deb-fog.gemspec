@@ -1,9 +1,9 @@
 $:.unshift File.expand_path("../lib", __FILE__)
-require "deb/s3"
+require "deb/fog"
 
 Gem::Specification.new do |gem|
-  gem.name        = "deb-s3"
-  gem.version     = Deb::S3::VERSION
+  gem.name        = "deb-fog"
+  gem.version     = Deb::Fog::VERSION
 
   gem.author      = "Paul Czarkowski"
   gem.email       = "paul.czarkowski@rackspace.com"

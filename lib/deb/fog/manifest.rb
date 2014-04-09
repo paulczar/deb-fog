@@ -89,6 +89,7 @@ class Deb::Fog::Manifest
     # generate the Packages file
     pkgs_temp = Tempfile.new("Packages")
     pkgs_temp.write manifest
+    puts "package contents: #{manifest}!!!!! to dists/#{@codename}/#{@component}/binary-#{@architecture}/Packages"
     pkgs_temp.close
     f = "dists/#{@codename}/#{@component}/binary-#{@architecture}/Packages"
     yield f if block_given?

@@ -68,6 +68,7 @@ module Deb::Fog::Utils
     # check if the object already exists
     unless obj.nil?
       file_md5 = Digest::MD5.file(path)
+      # puts "#{filename} - #{file_md5} vs #{obj.etag.gsub('"', '')}"
       return if file_md5.to_s == obj.etag.gsub('"', '')
     end
 

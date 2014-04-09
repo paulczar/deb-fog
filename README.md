@@ -1,12 +1,11 @@
-# deb-s3
+# deb-fog
 
-`deb-s3` is a simple utility to make creating and managing APT repositories on
-S3.
+`deb-fog` is a simple utility to make creating and managing APT repositories on
+Cloud object storage platforms.   It is based on a fork of the `deb-fog` repository found [here](https://github.com/krobertson/deb-fog)
 
-Most existing existing guides on using S3 to host an APT repository have you
+Most existing existing guides on using object storage to host an APT repository have you
 using something like [reprepro](http://mirrorer.alioth.debian.org/) to generate
-the repository file structure, and then [s3cmd](http://s3tools.org/s3cmd) to
-sync the files to S3.
+the repository file structure, and then [s3cmd](http://s3tools.org/s3cmd) or similar to sync the files to object storage.
 
 The annoying thing about this process is it requires you to maintain a local
 copy of the file tree for regenerating and syncing the next time. Personally,
@@ -14,7 +13,7 @@ my process is to use one-off virtual machines with
 [Vagrant](http://vagrantup.com), script out the build process, and then would
 prefer to just upload the final `.deb` from my Mac.
 
-With `deb-s3`, there is no need for this. `deb-s3` features:
+With `deb-fog`, there is no need for this. `deb-fog` features:
 
 * Downloads the existing package manifest and parses it.
 * Updates it with the new package, replacing the existing entry if already
@@ -28,22 +27,22 @@ With `deb-s3`, there is no need for this. `deb-s3` features:
 You can simply install it from rubygems:
 
 ```console
-$ gem install deb-s3
+$ gem install deb-fog
 ```
 
 Or to run the code directly, just check out the repo and run Bundler to ensure
 all dependencies are installed:
 
 ```console
-$ git clone https://github.com/krobertson/deb-s3.git
-$ cd deb-s3
+$ git clone https://github.com/krobertson/deb-fog.git
+$ cd deb-fog
 $ bundle install
 ```
 
 Now to upload a package, simply use:
 
 ```console
-$ deb-s3 upload --bucket my-bucket my-deb-package-1.0.0_amd64.deb
+$ deb-fog upload --provider Rackspace --bucket my-bucket my-deb-package-1.0.0_amd64.deb
 >> Examining package file my-deb-package-1.0.0_amd64.deb
 >> Retrieving existing package manifest
 >> Uploading package and new manifests to S3
@@ -56,7 +55,7 @@ $ deb-s3 upload --bucket my-bucket my-deb-package-1.0.0_amd64.deb
 
 ```
 Usage:
-  deb-s3 upload FILES
+  deb-fog upload FILES
 
 Options:
   -a, [--arch=ARCH]                     # The architecture of the package in the APT repository.
@@ -67,9 +66,15 @@ Options:
                                         # Default: stable
   -m, [--component=COMPONENT]           # The component of the APT repository.
                                         # Default: main
-      [--access-key-id=ACCESS_KEY]      # The access key for connecting to S3.
-      [--secret-access-key=SECRET_KEY]  # The secret key for connecting to S3.
-  -v, [--visibility=VISIBILITY]         # The access policy for the uploaded files. Can be public, private, or authenticated.
+      [--access-key-id=ACCESS_KEY]      # The access key or username for
+                                        # authenticating with your cloud 
+                                        # platform
+      [--secret-access-key=SECRET_KEY]  # The secret key or API key for 
+                                        # authenticating with your cloud 
+                                        # platform
+      [--provider=CLOUD_PROVIDER]       # the cloud to connect to Rackspace|AWS
+  -v, [--visibility=VISIBILITY]         # The access policy for the uploaded 
+  files. Can be public, private, or authenticated.
                                         # Default: public
 
 Uploads the given files to a S3 bucket as an APT repository.
@@ -81,7 +86,7 @@ packages in the specified component, codename and architecture.
 
 Now to delete the package:
 ```console
-$ deb-s3 delete --arch amd64 --bucket my-bucket --versions 1.0.0 my-deb-package
+$ deb-fog delete --provider Rackspace --arch amd64 --bucket my-bucket --versions 1.0.0 my-deb-package
 >> Retrieving existing manifests
    -- Deleting my-deb-package version 1.0.0
 >> Uploading new manifests to S3
@@ -95,7 +100,7 @@ $ deb-s3 delete --arch amd64 --bucket my-bucket --versions 1.0.0 my-deb-package
 You can also verify an existing APT repository on S3 using the `verify` command:
 
 ```console
-deb-s3 verify -b my-bucket
+deb-fog verify --provider Rackspace -b my-bucket
 >> Retrieving existing manifests
 >> Checking for missing packages in: stable/main i386
 >> Checking for missing packages in: stable/main amd64
@@ -104,7 +109,7 @@ deb-s3 verify -b my-bucket
 
 ```
 Usage:
-  deb-s3 verify
+  deb-fog verify
 
 Options:
   -f, [--fix-manifests]                 # Whether to fix problems in manifests when verifying.
@@ -114,8 +119,13 @@ Options:
                                         # Default: stable
   -m, [--component=COMPONENT]           # The component of the APT repository.
                                         # Default: main
-      [--access-key-id=ACCESS_KEY]      # The access key for connecting to S3.
-      [--secret-access-key=SECRET_KEY]  # The secret key for connecting to S3.
+      [--access-key-id=ACCESS_KEY]      # The access key or username for
+                                        # authenticating with your cloud 
+                                        # platform
+      [--secret-access-key=SECRET_KEY]  # The secret key or API key for 
+                                        # authenticating with your cloud 
+                                        # platform
+      [--provider=CLOUD_PROVIDER]       # the cloud to connect to Rackspace|AWS
   -v, [--visibility=VISIBILITY]         # The access policy for the uploaded files. Can be public, private, or authenticated.
                                         # Default: public
 
