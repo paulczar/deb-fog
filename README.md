@@ -1,7 +1,7 @@
 # deb-fog
 
 `deb-fog` is a simple utility to make creating and managing APT repositories on
-Cloud object storage platforms.   It is based on a fork of the `deb-fog` repository found [here](https://github.com/krobertson/deb-fog)
+Cloud object storage platforms.   It is based on a fork of the `deb-s3` repository found [here](https://github.com/krobertson/deb-s3)
 
 Most existing existing guides on using object storage to host an APT repository have you
 using something like [reprepro](http://mirrorer.alioth.debian.org/) to generate
