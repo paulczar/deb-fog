@@ -17,6 +17,8 @@ module Deb::Fog::Utils
   def gpg_options= v; @gpg_options = v end
   def prefix; @prefix end
   def prefix= v; @prefix = v end
+  def local; @local end;
+  def local= v; @local = v end;
 
   class SafeSystemError < RuntimeError; end
 
@@ -52,14 +54,15 @@ module Deb::Fog::Utils
   end
 
   def fog_exists?(path)
-    return true if Deb::Fog::Utils.bucket.files.head(File.basename(path))
+    return true if Deb::Fog::Utils.bucket.files.head( (Deb::Fog::Utils.local ? fog_path(path) : File.basename(path) ))
     return false
   end
 
   def fog_read(path)
     #puts "blerg: #{Deb::Fog::Utils.bucket.files}"
     return nil unless fog_exists?(path)
-    Deb::Fog::Utils.bucket.files[fog_path(path)].read
+    # i think the fog api changed since 1.21
+    Deb::Fog::Utils.bucket.files.get(fog_path(path)).body
   end
 
   def fog_store(path, filename=nil, content_type='application/octet-stream; charset=binary')
@@ -69,7 +72,12 @@ module Deb::Fog::Utils
     unless obj.nil?
       file_md5 = Digest::MD5.file(path)
       # puts "#{filename} - #{file_md5} vs #{obj.etag.gsub('"', '')}"
-      return if file_md5.to_s == obj.etag.gsub('"', '')
+      begin
+        return if file_md5.to_s == obj.etag.gsub('"', '')
+      rescue NoMethodError
+        # local storage provider does not provide etag
+        return true
+      end
     end
 
     # upload the file
