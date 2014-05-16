@@ -16,6 +16,10 @@ class Deb::Fog::CLI < Thor
   :aliases  => "-b",
   :desc     => "The name of the Fog bucket to upload to."
 
+  class_option :localroot,
+  :type     => :string,
+  :desc     => "The root direcotry of local storage."
+
   class_option :prefix,
   :type     => :string,
   :desc     => "The path prefix to use when storing on Fog."
@@ -88,6 +92,7 @@ class Deb::Fog::CLI < Thor
     "in the repository when uploading one."
 
   def upload(*files)
+    log(options)
     component = options[:component]
     if options[:section]
       component = options[:section]
@@ -282,9 +287,18 @@ class Deb::Fog::CLI < Thor
     when 'Rackspace'
       credentials[:rackspace_username] = options[:access_key_id]     if options[:access_key_id]
       credentials[:rackspace_api_key]  = options[:secret_access_key] if options[:secret_access_key]
+    when 'local'
+        error("No value provided for required options '--localroot'") unless options[:localroot]
     else
-      error("Invalid provider.  Can be AWS or Rackspace")
+      error("Invalid provider.  Can be AWS, Rackspace or local")
     end
+    
+    if options[:provider] == "local" then
+      credentials[:provider] = 'local'
+      credentials[:local_root] = options[:localroot]
+      Deb::Fog::Utils.local = true
+    end
+
     Deb::Fog::Utils.fog         = Fog::Storage.new(credentials)
     Deb::Fog::Utils.bucket      = Deb::Fog::Utils.fog.directories.new :key => options[:bucket]
     Deb::Fog::Utils.bucket.reload

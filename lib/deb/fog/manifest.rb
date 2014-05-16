@@ -1,5 +1,6 @@
 require "tempfile"
 require "zlib"
+require 'deb/fog/utils'
 
 class Deb::Fog::Manifest
   include Deb::Fog::Utils
